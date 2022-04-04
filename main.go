@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"sync"
 	"time"
 
-	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
@@ -18,66 +18,103 @@ type Metric struct {
 }
 
 type Collector interface {
-	Collect(<-chan time.Time, chan<- Metric)
+	Collect(<-chan time.Time) []Metric
 }
 
 type CPUCollector struct{}
 
-func (c *CPUCollector) Collect(timestampCh <-chan time.Time, metricCh chan<- Metric) {
-	for {
-		timestamp := <-timestampCh
-
-		metricCh <- Metric{
+func (c *CPUCollector) Collect(timestampCh <-chan time.Time) []Metric {
+	var metrics []Metric
+	for t := range timestampCh {
+		metrics = append(metrics, Metric{
 			Name:      "cpu",
-			Timestamp: timestamp,
+			Timestamp: t,
 			Value:     c.userCPU(),
-		}
+		})
 	}
+	return metrics
 }
 
 func (c *CPUCollector) userCPU() float64 {
-	cpustat, err := cpu.TimesWithContext(context.TODO(), false)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
-	}
-	cpustat0 := cpustat[0]
-
-	return float64(cpustat0.User / cpustat0.Total())
+	// cpustat, err := cpu.TimesWithContext(context.TODO(), false)
+	// if err != nil {
+	// 	fmt.Fprintf(os.Stderr, "%s\n", err)
+	// }
+	// cpustat0 := cpustat[0]
+	// return float64(cpustat0.User / cpustat0.Total())
+	return 0.123456789
 }
 
 type MemCollector struct{}
 
-func (m *MemCollector) Collect(timestampCh <-chan time.Time, metricCh chan<- Metric) {
-	for {
-		timestamp := <-timestampCh
-
+func (m *MemCollector) Collect(timestampCh <-chan time.Time) []Metric {
+	var metrics []Metric
+	for t := range timestampCh {
 		memstat, err := mem.VirtualMemory()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 		}
 
-		metricCh <- Metric{
+		metrics = append(metrics, Metric{
 			Name:      "memory",
-			Timestamp: timestamp,
+			Timestamp: t,
 			Value:     memstat.UsedPercent,
-		}
+		})
 	}
+	return metrics
 }
 
-type CollectorTODORename struct {
+type CollectorManager struct {
 	Metrics []Metric
 }
 
-func (c *CollectorTODORename) Run(ctx context.Context, tick <-chan time.Time, send chan<- []Metric) {
-	metricCh := make(chan Metric)
+func (c *CollectorManager) Run(ctx context.Context, send chan<- []Metric) {
+	ticker := c.Ticker(time.Second, 10)
 
 	cpuCollector := CPUCollector{}
 	memCollector := MemCollector{}
 
-	go cpuCollector.Collect(tick, metricCh)
-	go memCollector.Collect(tick, metricCh)
+	var wg sync.WaitGroup
+	wg.Add(2)
 
-	// var metrics []Metric
+	var cpuMetrics []Metric
+	go func() {
+		defer wg.Done()
+		cpuMetrics = cpuCollector.Collect(ticker)
+	}()
+
+	var memMetrics []Metric
+	go func() {
+		defer wg.Done()
+		memMetrics = memCollector.Collect(ticker)
+	}()
+
+	wg.Wait()
+
+	var metrics []Metric
+	metrics = append(metrics, cpuMetrics...)
+	metrics = append(metrics, memMetrics...)
+	send <- metrics
+}
+
+func (c *CollectorManager) Ticker(d time.Duration, count int) chan time.Time {
+	ticker := make(chan time.Time)
+	internalTicker := time.NewTicker(d)
+
+	go func() {
+		i := 0
+		for c := range internalTicker.C {
+			ticker <- c
+			if i >= count {
+				internalTicker.Stop()
+				close(ticker)
+				break
+			}
+			i++
+		}
+	}()
+
+	return ticker
 }
 
 type Publisher struct{}
@@ -95,6 +132,9 @@ func main() {
 	defer stop()
 
 	metricCh := make(chan []Metric)
+
+	collector := CollectorManager{}
+	go collector.Run(ctx, metricCh)
 
 	publisher := Publisher{}
 	go publisher.Run(ctx, metricCh)
