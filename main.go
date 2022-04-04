@@ -17,37 +17,67 @@ type Metric struct {
 	Value     float64
 }
 
-type Collector struct {
-	Metrics []Metric
+type Collector interface {
+	Collect(<-chan time.Time, chan<- Metric)
 }
 
-func (c *Collector) Run(ctx context.Context, send chan<- []Metric) {
-	for i := 0; i < 10; i++ {
-		timestamp := time.Now()
+type CPUCollector struct{}
 
-		cpustat, err := cpu.PercentWithContext(ctx, time.Second, false)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "%s\n", err)
+func (c *CPUCollector) Collect(timestampCh <-chan time.Time, metricCh chan<- Metric) {
+	for {
+		timestamp := <-timestampCh
+
+		metricCh <- Metric{
+			Name:      "cpu",
+			Timestamp: timestamp,
+			Value:     c.userCPU(),
 		}
+	}
+}
+
+func (c *CPUCollector) userCPU() float64 {
+	cpustat, err := cpu.TimesWithContext(context.TODO(), false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+	}
+	cpustat0 := cpustat[0]
+
+	return float64(cpustat0.User / cpustat0.Total())
+}
+
+type MemCollector struct{}
+
+func (m *MemCollector) Collect(timestampCh <-chan time.Time, metricCh chan<- Metric) {
+	for {
+		timestamp := <-timestampCh
 
 		memstat, err := mem.VirtualMemory()
 		if err != nil {
 			fmt.Fprintf(os.Stderr, "%s\n", err)
 		}
 
-		c.Metrics = append(c.Metrics, Metric{
-			Name:      "cpu.user",
-			Timestamp: timestamp,
-			Value:     cpustat[0],
-		})
-
-		c.Metrics = append(c.Metrics, Metric{
+		metricCh <- Metric{
 			Name:      "memory",
 			Timestamp: timestamp,
 			Value:     memstat.UsedPercent,
-		})
+		}
 	}
-	send <- c.Metrics
+}
+
+type CollectorTODORename struct {
+	Metrics []Metric
+}
+
+func (c *CollectorTODORename) Run(ctx context.Context, tick <-chan time.Time, send chan<- []Metric) {
+	metricCh := make(chan Metric)
+
+	cpuCollector := CPUCollector{}
+	memCollector := MemCollector{}
+
+	go cpuCollector.Collect(tick, metricCh)
+	go memCollector.Collect(tick, metricCh)
+
+	// var metrics []Metric
 }
 
 type Publisher struct{}
@@ -65,9 +95,6 @@ func main() {
 	defer stop()
 
 	metricCh := make(chan []Metric)
-
-	collector := Collector{}
-	go collector.Run(ctx, metricCh)
 
 	publisher := Publisher{}
 	go publisher.Run(ctx, metricCh)
