@@ -78,28 +78,25 @@ func (m *MemCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 }
 
 type CollectorManager struct {
-	Metrics []Metric
+	Collectors []Collector
 }
 
 func (c *CollectorManager) Run(ctx context.Context, send chan<- []Metric) {
-	cpuCollector := CPUCollector{}
-	memCollector := MemCollector{}
-
 	done := make(chan struct{})
 	recieve := make(chan []Metric)
 
-	go cpuCollector.Collect(done, recieve)
-	go memCollector.Collect(done, recieve)
+	for _, collector := range c.Collectors {
+		go collector.Collect(done, recieve)
+	}
 
 	time.Sleep(time.Second * 10)
 	close(done)
 
 	var metrics []Metric
-	m := <-recieve
-	metrics = append(metrics, m...)
-	m = <-recieve
-	metrics = append(metrics, m...)
-
+	for range c.Collectors {
+		m := <-recieve
+		metrics = append(metrics, m...)
+	}
 	send <- metrics
 }
 
@@ -119,7 +116,11 @@ func main() {
 
 	metricCh := make(chan []Metric)
 
-	collector := CollectorManager{}
+	collector := CollectorManager{
+		Collectors: []Collector{
+			&CPUCollector{}, &MemCollector{},
+		},
+	}
 	go collector.Run(ctx, metricCh)
 
 	publisher := Publisher{}
