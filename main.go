@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
-	"sync"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/mem"
@@ -18,12 +17,12 @@ type Metric struct {
 }
 
 type Collector interface {
-	Collect(<-chan struct{}) []Metric
+	Collect(<-chan struct{}, chan<- []Metric)
 }
 
 type CPUCollector struct{}
 
-func (c *CPUCollector) Collect(done <-chan struct{}) []Metric {
+func (c *CPUCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 	var metrics []Metric
 	ticker := time.NewTicker(time.Second)
 
@@ -36,7 +35,8 @@ func (c *CPUCollector) Collect(done <-chan struct{}) []Metric {
 				Value:     c.userCPU(),
 			})
 		case <-done:
-			return metrics
+			send <- metrics
+			return
 		}
 	}
 }
@@ -53,7 +53,7 @@ func (c *CPUCollector) userCPU() float64 {
 
 type MemCollector struct{}
 
-func (m *MemCollector) Collect(done <-chan struct{}) []Metric {
+func (m *MemCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 	var metrics []Metric
 	ticker := time.NewTicker(time.Second)
 
@@ -71,7 +71,8 @@ func (m *MemCollector) Collect(done <-chan struct{}) []Metric {
 				Value:     memstat.UsedPercent,
 			})
 		case <-done:
-			return metrics
+			send <- metrics
+			return
 		}
 	}
 }
@@ -85,29 +86,20 @@ func (c *CollectorManager) Run(ctx context.Context, send chan<- []Metric) {
 	memCollector := MemCollector{}
 
 	done := make(chan struct{})
-	var wg sync.WaitGroup
-	wg.Add(2)
+	recieve := make(chan []Metric)
 
-	var cpuMetrics []Metric
-	go func() {
-		defer wg.Done()
-		cpuMetrics = cpuCollector.Collect(done)
-	}()
-
-	var memMetrics []Metric
-	go func() {
-		defer wg.Done()
-		memMetrics = memCollector.Collect(done)
-	}()
+	go cpuCollector.Collect(done, recieve)
+	go memCollector.Collect(done, recieve)
 
 	time.Sleep(time.Second * 10)
 	close(done)
 
-	wg.Wait()
-
 	var metrics []Metric
-	metrics = append(metrics, cpuMetrics...)
-	metrics = append(metrics, memMetrics...)
+	m := <-recieve
+	metrics = append(metrics, m...)
+	m = <-recieve
+	metrics = append(metrics, m...)
+
 	send <- metrics
 }
 
