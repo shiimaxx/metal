@@ -7,6 +7,7 @@ import (
 	"os/signal"
 	"time"
 
+	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
 )
 
@@ -26,29 +27,29 @@ func (c *CPUCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 	var metrics []Metric
 	ticker := time.NewTicker(time.Second)
 
+	_, err := cpu.Percent(0, false)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+	}
+
 	for {
 		select {
 		case t := <-ticker.C:
+			cpuuser, err := cpu.Percent(0, false)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+			}
+
 			metrics = append(metrics, Metric{
 				Name:      "cpu",
 				Timestamp: t,
-				Value:     c.userCPU(),
+				Value:     cpuuser[0],
 			})
 		case <-done:
 			send <- metrics
 			return
 		}
 	}
-}
-
-func (c *CPUCollector) userCPU() float64 {
-	// cpustat, err := cpu.TimesWithContext(context.TODO(), false)
-	// if err != nil {
-	// 	fmt.Fprintf(os.Stderr, "%s\n", err)
-	// }
-	// cpustat0 := cpustat[0]
-	// return float64(cpustat0.User / cpustat0.Total())
-	return 0.123456789
 }
 
 type MemCollector struct{}
