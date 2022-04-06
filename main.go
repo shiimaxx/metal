@@ -92,12 +92,9 @@ func (c *CollectorManager) Run(ctx context.Context, send chan<- []Metric) {
 	time.Sleep(time.Second * 10)
 	close(done)
 
-	var metrics []Metric
 	for range c.Collectors {
-		m := <-recieve
-		metrics = append(metrics, m...)
+		send <- <-recieve
 	}
-	send <- metrics
 }
 
 type Publisher struct{}
