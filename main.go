@@ -133,8 +133,12 @@ func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan []Me
 						Value:      &metric.Value,
 					},
 				},
+				Namespace: aws.String("isd"),
 			}
-			p.Client.PutMetricData(ctx, input)
+			_, err := p.Client.PutMetricData(ctx, input)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+			}
 		}
 	}
 }
@@ -152,7 +156,7 @@ func main() {
 	}
 	go collector.Run(ctx, metricCh)
 
-	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("asia-northeast-1"))
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
 	if err != nil {
 		log.Fatal(err)
 	}
