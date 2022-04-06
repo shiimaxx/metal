@@ -3,12 +3,18 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"os"
 	"os/signal"
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
 	"github.com/shirou/gopsutil/v3/mem"
+
+	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
+	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
 
 type Metric struct {
@@ -98,12 +104,37 @@ func (c *CollectorManager) Run(ctx context.Context, send chan<- []Metric) {
 	}
 }
 
-type Publisher struct{}
+type Publisher interface {
+	Run(context.Context, <-chan []Metric)
+}
 
-func (p *Publisher) Run(ctx context.Context, recieve <-chan []Metric) {
+type StdoutPublisher struct{}
+
+func (p *StdoutPublisher) Run(ctx context.Context, recieve <-chan []Metric) {
 	for {
 		for _, metric := range <-recieve {
 			fmt.Printf("%+v\n", metric)
+		}
+	}
+}
+
+type AmazonCloudWatchPublisher struct {
+	Client *cloudwatch.Client
+}
+
+func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan []Metric) {
+	for {
+		for _, metric := range <-recieve {
+			input := &cloudwatch.PutMetricDataInput{
+				MetricData: []types.MetricDatum{
+					{
+						MetricName: aws.String(metric.Name),
+						Timestamp:  &metric.Timestamp,
+						Value:      &metric.Value,
+					},
+				},
+			}
+			p.Client.PutMetricData(ctx, input)
 		}
 	}
 }
@@ -121,7 +152,14 @@ func main() {
 	}
 	go collector.Run(ctx, metricCh)
 
-	publisher := Publisher{}
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("asia-northeast-1"))
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	client := cloudwatch.NewFromConfig(cfg)
+
+	publisher := AmazonCloudWatchPublisher{Client: client}
 	go publisher.Run(ctx, metricCh)
 
 	<-ctx.Done()
