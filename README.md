@@ -1,4 +1,4 @@
-# isu-agent
+# isd
 
 This is an agent that helps your application spead up "iikanjini".
 
