@@ -1,4 +1,4 @@
-# isd
+# IStatsD
 
 This is an agent that helps your application spead up "iikanjini".
 
