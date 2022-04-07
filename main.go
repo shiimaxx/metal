@@ -128,9 +128,10 @@ func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan []Me
 			input := &cloudwatch.PutMetricDataInput{
 				MetricData: []types.MetricDatum{
 					{
-						MetricName: aws.String(metric.Name),
-						Timestamp:  &metric.Timestamp,
-						Value:      &metric.Value,
+						MetricName:        aws.String(metric.Name),
+						Timestamp:         &metric.Timestamp,
+						Value:             &metric.Value,
+						StorageResolution: aws.Int32(1),
 					},
 				},
 				Namespace: aws.String("isd"),
