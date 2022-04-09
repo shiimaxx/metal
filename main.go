@@ -141,7 +141,32 @@ func (m *MemCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 			metrics = append(metrics, Metric{
 				Name:      "MemoryUsed",
 				Timestamp: t,
-				Value:     memstat.UsedPercent,
+				Value:     float64(memstat.Used),
+			})
+			metrics = append(metrics, Metric{
+				Name:      "MemoryFree",
+				Timestamp: t,
+				Value:     float64(memstat.Free),
+			})
+			metrics = append(metrics, Metric{
+				Name:      "MemoryShared",
+				Timestamp: t,
+				Value:     float64(memstat.Shared),
+			})
+			metrics = append(metrics, Metric{
+				Name:      "MemoryBuffers",
+				Timestamp: t,
+				Value:     float64(memstat.Buffers),
+			})
+			metrics = append(metrics, Metric{
+				Name:      "MemoryCached",
+				Timestamp: t,
+				Value:     float64(memstat.Cached),
+			})
+			metrics = append(metrics, Metric{
+				Name:      "MemoryAvailable",
+				Timestamp: t,
+				Value:     float64(memstat.Available),
 			})
 		case <-done:
 			send <- metrics
@@ -179,7 +204,7 @@ type StdoutPublisher struct{}
 func (p *StdoutPublisher) Run(ctx context.Context, recieve <-chan []Metric) {
 	for {
 		for _, metric := range <-recieve {
-			fmt.Printf("%+v\n", metric)
+			fmt.Printf("%s\t%f\t%d\n", metric.Name, metric.Value, metric.Timestamp.Unix())
 		}
 	}
 }
