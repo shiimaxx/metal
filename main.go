@@ -20,6 +20,7 @@ type Metric struct {
 	Name      string
 	Timestamp time.Time
 	Value     float64
+	Tags      map[string]string
 }
 
 type Collector interface {
