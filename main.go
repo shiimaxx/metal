@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
 	"github.com/shirou/gopsutil/v3/mem"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -175,6 +176,80 @@ func (m *MemCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 	}
 }
 
+type DiskIOCollector struct {
+	Devices []string
+}
+
+func (d *DiskIOCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
+	var metrics []Metric
+	ticker := time.NewTicker(time.Second)
+
+	previous := make(map[string]disk.IOCountersStat)
+	var latest map[string]disk.IOCountersStat
+	var err error
+
+	latest, err = disk.IOCountersWithContext(context.TODO(), d.Devices...)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
+	}
+
+	for {
+		select {
+		case t := <-ticker.C:
+			for k, v := range latest {
+				previous[k] = v
+			}
+			latest, err = disk.IOCountersWithContext(context.TODO(), d.Devices...)
+			if err != nil {
+				fmt.Fprintf(os.Stderr, "%s\n", err)
+			}
+
+			for device, l := range latest {
+				p := previous[device]
+				diff := disk.IOCountersStat{
+					ReadCount:        l.ReadCount - p.ReadCount,
+					MergedReadCount:  l.MergedReadCount - p.MergedReadCount,
+					WriteCount:       l.WriteCount - p.WriteCount,
+					MergedWriteCount: l.MergedWriteCount - p.MergedWriteCount,
+					ReadBytes:        l.ReadBytes - p.ReadBytes,
+					WriteBytes:       l.WriteBytes - p.WriteBytes,
+					ReadTime:         l.ReadTime - p.ReadTime,
+					WriteTime:        l.WriteTime - p.WriteTime,
+					IopsInProgress:   l.IopsInProgress - p.IopsInProgress,
+					IoTime:           l.IoTime - p.IoTime,
+					WeightedIO:       l.WeightedIO - p.WeightedIO,
+					Name:             l.Name,
+					SerialNumber:     l.SerialNumber,
+					Label:            l.Label,
+				}
+				metrics = append(metrics, Metric{
+					Name:      "ReadCount",
+					Timestamp: t,
+					Value:     float64(diff.ReadCount),
+				})
+				metrics = append(metrics, Metric{
+					Name:      "WriteCount",
+					Timestamp: t,
+					Value:     float64(diff.WriteCount),
+				})
+				metrics = append(metrics, Metric{
+					Name:      "ReadBytes",
+					Timestamp: t,
+					Value:     float64(diff.ReadBytes),
+				})
+				metrics = append(metrics, Metric{
+					Name:      "WriteBytes",
+					Timestamp: t,
+					Value:     float64(diff.WriteBytes),
+				})
+			}
+		case <-done:
+			send <- metrics
+			return
+		}
+	}
+}
+
 type CollectorManager struct {
 	Collectors []Collector
 }
@@ -243,7 +318,9 @@ func main() {
 
 	collector := CollectorManager{
 		Collectors: []Collector{
-			&CPUCollector{}, &MemCollector{},
+			&CPUCollector{},
+			&MemCollector{},
+			&DiskIOCollector{Devices: []string{"sda"}},
 		},
 	}
 	go collector.Run(ctx, metricCh)
