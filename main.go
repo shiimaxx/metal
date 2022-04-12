@@ -319,7 +319,7 @@ func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan []Me
 						Dimensions:        dimensions,
 					},
 				},
-				Namespace: aws.String("isd"),
+				Namespace: aws.String("IStatsD"),
 			}
 			_, err := p.Client.PutMetricData(ctx, input)
 			if err != nil {
