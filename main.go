@@ -206,6 +206,10 @@ func (d *DiskIOCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 			}
 
 			for device, l := range latest {
+				tags := map[string]string{
+					"device": device,
+				}
+
 				p := previous[device]
 				diff := disk.IOCountersStat{
 					ReadCount:        l.ReadCount - p.ReadCount,
@@ -227,21 +231,25 @@ func (d *DiskIOCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 					Name:      "ReadCount",
 					Timestamp: t,
 					Value:     float64(diff.ReadCount),
+					Tags:      tags,
 				})
 				metrics = append(metrics, Metric{
 					Name:      "WriteCount",
 					Timestamp: t,
 					Value:     float64(diff.WriteCount),
+					Tags:      tags,
 				})
 				metrics = append(metrics, Metric{
 					Name:      "ReadBytes",
 					Timestamp: t,
 					Value:     float64(diff.ReadBytes),
+					Tags:      tags,
 				})
 				metrics = append(metrics, Metric{
 					Name:      "WriteBytes",
 					Timestamp: t,
 					Value:     float64(diff.WriteBytes),
+					Tags:      tags,
 				})
 			}
 		case <-done:
@@ -292,6 +300,7 @@ type AmazonCloudWatchPublisher struct {
 func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan []Metric) {
 	for {
 		for _, metric := range <-recieve {
+			dimensions := p.convertTags(metric.Tags)
 			input := &cloudwatch.PutMetricDataInput{
 				MetricData: []types.MetricDatum{
 					{
@@ -299,6 +308,7 @@ func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan []Me
 						Timestamp:         &metric.Timestamp,
 						Value:             &metric.Value,
 						StorageResolution: aws.Int32(1),
+						Dimensions:        dimensions,
 					},
 				},
 				Namespace: aws.String("isd"),
@@ -309,6 +319,18 @@ func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan []Me
 			}
 		}
 	}
+}
+
+func (p *AmazonCloudWatchPublisher) convertTags(tags map[string]string) []types.Dimension {
+	var dimensions []types.Dimension
+
+	for k, v := range tags {
+		dimensions = append(dimensions, types.Dimension{
+			Name:  aws.String(k),
+			Value: aws.String(v),
+		})
+	}
+	return dimensions
 }
 
 func main() {
