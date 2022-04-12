@@ -288,7 +288,15 @@ type StdoutPublisher struct{}
 func (p *StdoutPublisher) Run(ctx context.Context, recieve <-chan []Metric) {
 	for {
 		for _, metric := range <-recieve {
-			fmt.Printf("%s\t%f\t%d\n", metric.Name, metric.Value, metric.Timestamp.Unix())
+			var tags string
+			if len(metric.Tags) > 0 {
+				tags += "{"
+				for k, v := range metric.Tags {
+					tags += fmt.Sprintf("%s=\"%s\"", k, v)
+				}
+				tags += "}"
+			}
+			fmt.Printf("%s%s %f %d\n", metric.Name, tags, metric.Value, metric.Timestamp.Unix())
 		}
 	}
 }
