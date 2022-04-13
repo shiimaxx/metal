@@ -333,19 +333,26 @@ type CollectorManager struct {
 	Collectors []Collector
 }
 
-func (c *CollectorManager) Run(ctx context.Context, send chan<- []Metric) {
-	done := make(chan struct{})
-	recieve := make(chan []Metric)
+func (c *CollectorManager) Run(ctx context.Context, duration <-chan time.Duration, send chan<- []Metric) {
+	for {
+		select {
+		case d := <-duration:
+			done := make(chan struct{})
+			recieve := make(chan []Metric)
 
-	for _, collector := range c.Collectors {
-		go collector.Collect(done, recieve)
-	}
+			for _, collector := range c.Collectors {
+				go collector.Collect(done, recieve)
+			}
 
-	time.Sleep(time.Second * 10)
-	close(done)
+			time.Sleep(d)
+			close(done)
 
-	for range c.Collectors {
-		send <- <-recieve
+			for range c.Collectors {
+				send <- <-recieve
+			}
+		case <-ctx.Done():
+			return
+		}
 	}
 }
 
@@ -415,6 +422,7 @@ func main() {
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer stop()
 
+	duration := make(chan time.Duration)
 	metricCh := make(chan []Metric)
 
 	collector := CollectorManager{
@@ -424,7 +432,7 @@ func main() {
 			&DiskIOCollector{Devices: []string{"sda"}},
 		},
 	}
-	go collector.Run(ctx, metricCh)
+	go collector.Run(ctx, duration, metricCh)
 
 	// cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
 	// if err != nil {
@@ -435,6 +443,8 @@ func main() {
 
 	publisher := StdoutPublisher{}
 	go publisher.Run(ctx, metricCh)
+
+	duration <- time.Second * 60
 
 	<-ctx.Done()
 }
