@@ -27,12 +27,10 @@ func main() {
 	}
 	go collector.Run(ctx, duration, metricCh)
 
-	// cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+	// publisher, err := publisher.NewAmazonCloudEatchPublisher()
 	// if err != nil {
 	// 	log.Fatal(err)
 	// }
-	// client := cloudwatch.NewFromConfig(cfg)
-	// publisher := publisher.AmazonCloudWatchPublisher{Client: client}
 
 	publisher := publisher.StdoutPublisher{}
 	go publisher.Run(ctx, metricCh)

@@ -6,13 +6,24 @@ import (
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
+	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
+
 	"github.com/shiimaxx/istatsd/types"
 )
 
 type AmazonCloudWatchPublisher struct {
 	Client *cloudwatch.Client
+}
+
+func NewAmazonCloudEatchPublisher() (*AmazonCloudWatchPublisher, error) {
+	cfg, err := config.LoadDefaultConfig(context.TODO(), config.WithRegion("ap-northeast-1"))
+	if err != nil {
+		return nil, err
+	}
+	client := cloudwatch.NewFromConfig(cfg)
+	return &AmazonCloudWatchPublisher{Client: client}, nil
 }
 
 func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan types.Metrics) {
