@@ -17,6 +17,10 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 )
 
+type Metrics struct {
+	Data []Metric
+}
+
 type Metric struct {
 	Name      string
 	Timestamp time.Time
@@ -25,13 +29,13 @@ type Metric struct {
 }
 
 type Collector interface {
-	Collect(<-chan struct{}, chan<- []Metric)
+	Collect(<-chan struct{}, chan<- Metrics)
 }
 
 type CPUCollector struct{}
 
-func (c *CPUCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
-	var metrics []Metric
+func (c *CPUCollector) Collect(done <-chan struct{}, send chan<- Metrics) {
+	var metrics Metrics
 	ticker := time.NewTicker(time.Second)
 
 	var previousCPUStats []cpu.TimesStat
@@ -70,52 +74,52 @@ func (c *CPUCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 				GuestNice: latest.GuestNice - previous.GuestNice,
 			}
 
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUUser",
 				Timestamp: t,
 				Value:     diff.User / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUSystem",
 				Timestamp: t,
 				Value:     diff.System / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUIdle",
 				Timestamp: t,
 				Value:     diff.Idle / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUNice",
 				Timestamp: t,
 				Value:     diff.Nice / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUIowait",
 				Timestamp: t,
 				Value:     diff.Iowait / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUIrq",
 				Timestamp: t,
 				Value:     diff.Irq / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUSoftirq",
 				Timestamp: t,
 				Value:     diff.Softirq / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUSteal",
 				Timestamp: t,
 				Value:     diff.Steal / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUGuest",
 				Timestamp: t,
 				Value:     diff.Guest / diff.Total() * 100,
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "CPUGuestNice",
 				Timestamp: t,
 				Value:     diff.GuestNice / diff.Total() * 100,
@@ -129,8 +133,8 @@ func (c *CPUCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 
 type MemCollector struct{}
 
-func (m *MemCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
-	var metrics []Metric
+func (m *MemCollector) Collect(done <-chan struct{}, send chan<- Metrics) {
+	var metrics Metrics
 	ticker := time.NewTicker(time.Second)
 
 	for {
@@ -141,32 +145,32 @@ func (m *MemCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 			}
 
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "MemoryUsed",
 				Timestamp: t,
 				Value:     float64(memstat.Used),
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "MemoryFree",
 				Timestamp: t,
 				Value:     float64(memstat.Free),
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "MemoryShared",
 				Timestamp: t,
 				Value:     float64(memstat.Shared),
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "MemoryBuffers",
 				Timestamp: t,
 				Value:     float64(memstat.Buffers),
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "MemoryCached",
 				Timestamp: t,
 				Value:     float64(memstat.Cached),
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "MemoryAvailable",
 				Timestamp: t,
 				Value:     float64(memstat.Available),
@@ -182,8 +186,8 @@ type DiskIOCollector struct {
 	Devices []string
 }
 
-func (d *DiskIOCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
-	var metrics []Metric
+func (d *DiskIOCollector) Collect(done <-chan struct{}, send chan<- Metrics) {
+	var metrics Metrics
 	ticker := time.NewTicker(time.Second)
 
 	previous := make(map[string]disk.IOCountersStat)
@@ -228,25 +232,25 @@ func (d *DiskIOCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 					SerialNumber:     l.SerialNumber,
 					Label:            l.Label,
 				}
-				metrics = append(metrics, Metric{
+				metrics.Data = append(metrics.Data, Metric{
 					Name:      "DiskReadCount",
 					Timestamp: t,
 					Value:     float64(diff.ReadCount),
 					Tags:      tags,
 				})
-				metrics = append(metrics, Metric{
+				metrics.Data = append(metrics.Data, Metric{
 					Name:      "DiskWriteCount",
 					Timestamp: t,
 					Value:     float64(diff.WriteCount),
 					Tags:      tags,
 				})
-				metrics = append(metrics, Metric{
+				metrics.Data = append(metrics.Data, Metric{
 					Name:      "DiskReadBytes",
 					Timestamp: t,
 					Value:     float64(diff.ReadBytes),
 					Tags:      tags,
 				})
-				metrics = append(metrics, Metric{
+				metrics.Data = append(metrics.Data, Metric{
 					Name:      "DiskWriteBytes",
 					Timestamp: t,
 					Value:     float64(diff.WriteBytes),
@@ -263,8 +267,8 @@ func (d *DiskIOCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 type NetIOCollector struct {
 }
 
-func (n *NetIOCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
-	var metrics []Metric
+func (n *NetIOCollector) Collect(done <-chan struct{}, send chan<- Metrics) {
+	var metrics Metrics
 	ticker := time.NewTicker(time.Second)
 
 	var previous []net.IOCountersStat
@@ -302,22 +306,22 @@ func (n *NetIOCollector) Collect(done <-chan struct{}, send chan<- []Metric) {
 				Fifoout:     l.Fifoout - p.Fifoout,
 			}
 
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "NetworkBytesSent",
 				Timestamp: t,
 				Value:     float64(diff.BytesSent),
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "NetworkBytesRecv",
 				Timestamp: t,
 				Value:     float64(diff.BytesRecv),
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "NetworkPacketSent",
 				Timestamp: t,
 				Value:     float64(diff.PacketsSent),
 			})
-			metrics = append(metrics, Metric{
+			metrics.Data = append(metrics.Data, Metric{
 				Name:      "NetworkPacketRecv",
 				Timestamp: t,
 				Value:     float64(diff.PacketsRecv),
@@ -333,12 +337,12 @@ type CollectorManager struct {
 	Collectors []Collector
 }
 
-func (c *CollectorManager) Run(ctx context.Context, duration <-chan time.Duration, send chan<- []Metric) {
+func (c *CollectorManager) Run(ctx context.Context, duration <-chan time.Duration, send chan<- Metrics) {
 	for {
 		select {
 		case d := <-duration:
 			done := make(chan struct{})
-			recieve := make(chan []Metric)
+			recieve := make(chan Metrics)
 
 			for _, collector := range c.Collectors {
 				go collector.Collect(done, recieve)
@@ -362,18 +366,23 @@ type Publisher interface {
 
 type StdoutPublisher struct{}
 
-func (p *StdoutPublisher) Run(ctx context.Context, recieve <-chan []Metric) {
+func (p *StdoutPublisher) Run(ctx context.Context, recieve <-chan Metrics) {
 	for {
-		for _, metric := range <-recieve {
-			var tags string
-			if len(metric.Tags) > 0 {
-				tags += "{"
-				for k, v := range metric.Tags {
-					tags += fmt.Sprintf("%s=\"%s\"", k, v)
+		select {
+		case metrics := <-recieve:
+			for _, m := range metrics.Data {
+				var tags string
+				if len(m.Tags) > 0 {
+					tags += "{"
+					for k, v := range m.Tags {
+						tags += fmt.Sprintf("%s=\"%s\"", k, v)
+					}
+					tags += "}"
 				}
-				tags += "}"
+				fmt.Printf("%s%s %f %d\n", m.Name, tags, m.Value, m.Timestamp.Unix())
 			}
-			fmt.Printf("%s%s %f %d\n", metric.Name, tags, metric.Value, metric.Timestamp.Unix())
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -382,26 +391,31 @@ type AmazonCloudWatchPublisher struct {
 	Client *cloudwatch.Client
 }
 
-func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan []Metric) {
+func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan Metrics) {
 	for {
-		for _, metric := range <-recieve {
-			dimensions := p.convertTags(metric.Tags)
+		select {
+		case metrics := <-recieve:
+			var mData []types.MetricDatum
+			for _, m := range metrics.Data {
+				dimensions := p.convertTags(m.Tags)
+				mData = append(mData, types.MetricDatum{
+					MetricName:        aws.String(m.Name),
+					Timestamp:         &m.Timestamp,
+					Value:             &m.Value,
+					StorageResolution: aws.Int32(1),
+					Dimensions:        dimensions,
+				})
+			}
 			input := &cloudwatch.PutMetricDataInput{
-				MetricData: []types.MetricDatum{
-					{
-						MetricName:        aws.String(metric.Name),
-						Timestamp:         &metric.Timestamp,
-						Value:             &metric.Value,
-						StorageResolution: aws.Int32(1),
-						Dimensions:        dimensions,
-					},
-				},
-				Namespace: aws.String("IStatsD"),
+				MetricData: mData,
+				Namespace:  aws.String("IStatsD"),
 			}
 			_, err := p.Client.PutMetricData(ctx, input)
 			if err != nil {
 				fmt.Fprintf(os.Stderr, "%s\n", err)
 			}
+		case <-ctx.Done():
+			return
 		}
 	}
 }
@@ -423,13 +437,13 @@ func main() {
 	defer stop()
 
 	duration := make(chan time.Duration)
-	metricCh := make(chan []Metric)
+	metricCh := make(chan Metrics)
 
 	collector := CollectorManager{
 		Collectors: []Collector{
 			&CPUCollector{},
 			&MemCollector{},
-			&DiskIOCollector{Devices: []string{"sda"}},
+			// &DiskIOCollector{Devices: []string{"sda"}},
 		},
 	}
 	go collector.Run(ctx, duration, metricCh)
@@ -444,7 +458,7 @@ func main() {
 	publisher := StdoutPublisher{}
 	go publisher.Run(ctx, metricCh)
 
-	duration <- time.Second * 60
+	duration <- time.Second * 10
 
 	<-ctx.Done()
 }
