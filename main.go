@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"strconv"
 	"syscall"
 	"time"
 
@@ -52,7 +53,23 @@ func (s *Server) run(ctx context.Context) error {
 
 func (s *Server) collect() http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		s.duration <- time.Second * 10
+		var sec int
+		var err error
+		if paramSec := r.URL.Query().Get("seconds"); paramSec != "" {
+			if sec, err = strconv.Atoi(paramSec); err != nil {
+				http.Error(w, "seconds must be integer", http.StatusBadRequest)
+				return
+			}
+
+			if sec < 10 {
+				http.Error(w, "seconds must be over than 10", http.StatusBadRequest)
+				return
+			}
+		} else {
+			sec = 60
+		}
+
+		s.duration <- time.Second * time.Duration(sec)
 	}
 }
 
