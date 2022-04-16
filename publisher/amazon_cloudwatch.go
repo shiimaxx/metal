@@ -3,6 +3,7 @@ package publisher
 import (
 	"context"
 	"fmt"
+	"math"
 	"os"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
@@ -27,7 +28,8 @@ func NewAmazonCloudEatchPublisher() (*AmazonCloudWatchPublisher, error) {
 }
 
 func (p *AmazonCloudWatchPublisher) Publish(ctx context.Context, metrics types.Metrics) {
-	var mData []cwtypes.MetricDatum
+	mData := make([][]cwtypes.MetricDatum, int(math.Ceil(float64(len(metrics.Data))/20.0)))
+	i := 0
 	for _, m := range metrics.Data {
 		dimensions := p.convertTags(m.Tags)
 		data := cwtypes.MetricDatum{
@@ -37,15 +39,21 @@ func (p *AmazonCloudWatchPublisher) Publish(ctx context.Context, metrics types.M
 			StorageResolution: aws.Int32(1),
 			Dimensions:        dimensions,
 		}
-		mData = append(mData, data)
+		mData[i] = append(mData[i], data)
+		if len(mData[i]) >= 20 {
+			i++
+		}
 	}
-	input := &cloudwatch.PutMetricDataInput{
-		MetricData: mData,
-		Namespace:  aws.String("METAL"),
-	}
-	_, err := p.Client.PutMetricData(ctx, input)
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "%s\n", err)
+
+	for _, d := range mData {
+		input := &cloudwatch.PutMetricDataInput{
+			MetricData: d,
+			Namespace:  aws.String("METAL"),
+		}
+		_, err := p.Client.PutMetricData(ctx, input)
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "%s\n", err)
+		}
 	}
 }
 
