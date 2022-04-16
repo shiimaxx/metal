@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
+	"syscall"
 	"time"
 
 	"github.com/shiimaxx/istatsd/collector"
@@ -34,7 +35,19 @@ func (s *Server) run(ctx context.Context) error {
 		return err
 	}
 
-	return srv.Serve(l)
+	errCh := make(chan error)
+	go func() {
+		if err := srv.Serve(l); err != nil {
+			errCh <- err
+		}
+	}()
+
+	select {
+	case err := <-errCh:
+		return err
+	case <-ctx.Done():
+		return nil
+	}
 }
 
 func (s *Server) collect() http.HandlerFunc {
@@ -44,7 +57,7 @@ func (s *Server) collect() http.HandlerFunc {
 }
 
 func main() {
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
 
 	duration := make(chan time.Duration)
@@ -71,5 +84,7 @@ func main() {
 		port:     8080,
 		duration: duration,
 	}
-	log.Fatal(server.run(ctx))
+	if err := server.run(ctx); err != nil {
+		log.Fatal(err)
+	}
 }
