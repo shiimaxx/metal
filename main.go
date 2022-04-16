@@ -12,9 +12,9 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/shiimaxx/istatsd/collector"
-	"github.com/shiimaxx/istatsd/publisher"
-	"github.com/shiimaxx/istatsd/types"
+	"github.com/shiimaxx/metal/collector"
+	"github.com/shiimaxx/metal/publisher"
+	"github.com/shiimaxx/metal/types"
 )
 
 type Server struct {

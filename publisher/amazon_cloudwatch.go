@@ -10,7 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go-v2/service/cloudwatch"
 	cwtypes "github.com/aws/aws-sdk-go-v2/service/cloudwatch/types"
 
-	"github.com/shiimaxx/istatsd/types"
+	"github.com/shiimaxx/metal/types"
 )
 
 type AmazonCloudWatchPublisher struct {
@@ -40,7 +40,7 @@ func (p *AmazonCloudWatchPublisher) Publish(ctx context.Context, metrics types.M
 	}
 	input := &cloudwatch.PutMetricDataInput{
 		MetricData: mData,
-		Namespace:  aws.String("IStatsD"),
+		Namespace:  aws.String("metal"),
 	}
 	_, err := p.Client.PutMetricData(ctx, input)
 	if err != nil {

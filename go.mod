@@ -1,4 +1,4 @@
-module github.com/shiimaxx/istatsd
+module github.com/shiimaxx/metal
 
 go 1.18
 

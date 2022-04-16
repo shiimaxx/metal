@@ -8,7 +8,7 @@ import (
 
 	"github.com/shirou/gopsutil/v3/cpu"
 
-	"github.com/shiimaxx/istatsd/types"
+	"github.com/shiimaxx/metal/types"
 )
 
 type CPUCollector struct{}

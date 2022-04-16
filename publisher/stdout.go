@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/shiimaxx/istatsd/types"
+	"github.com/shiimaxx/metal/types"
 )
 
 type StdoutPublisher struct{}

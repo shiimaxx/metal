@@ -7,7 +7,7 @@ import (
 
 	"github.com/shirou/gopsutil/v3/mem"
 
-	"github.com/shiimaxx/istatsd/types"
+	"github.com/shiimaxx/metal/types"
 )
 
 type MemCollector struct{}

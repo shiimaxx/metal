@@ -3,7 +3,7 @@ package publisher
 import (
 	"context"
 
-	"github.com/shiimaxx/istatsd/types"
+	"github.com/shiimaxx/metal/types"
 )
 
 type Publisher interface {

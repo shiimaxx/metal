@@ -8,7 +8,7 @@ import (
 
 	"github.com/shirou/gopsutil/v3/net"
 
-	"github.com/shiimaxx/istatsd/types"
+	"github.com/shiimaxx/metal/types"
 )
 
 type NetIOCollector struct {
