@@ -77,7 +77,11 @@ func main() {
 	// 	log.Fatal(err)
 	// }
 
-	publisher := publisher.StdoutPublisher{}
+	publisher := publisher.PublisherManager{
+		Publishers: []publisher.Publisher{
+			&publisher.StdoutPublisher{},
+		},
+	}
 	go publisher.Run(ctx, metricCh)
 
 	server := Server{

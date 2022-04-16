@@ -26,32 +26,25 @@ func NewAmazonCloudEatchPublisher() (*AmazonCloudWatchPublisher, error) {
 	return &AmazonCloudWatchPublisher{Client: client}, nil
 }
 
-func (p *AmazonCloudWatchPublisher) Run(ctx context.Context, recieve <-chan types.Metrics) {
-	for {
-		select {
-		case metrics := <-recieve:
-			var mData []cwtypes.MetricDatum
-			for _, m := range metrics.Data {
-				dimensions := p.convertTags(m.Tags)
-				mData = append(mData, cwtypes.MetricDatum{
-					MetricName:        aws.String(m.Name),
-					Timestamp:         &m.Timestamp,
-					Value:             &m.Value,
-					StorageResolution: aws.Int32(1),
-					Dimensions:        dimensions,
-				})
-			}
-			input := &cloudwatch.PutMetricDataInput{
-				MetricData: mData,
-				Namespace:  aws.String("IStatsD"),
-			}
-			_, err := p.Client.PutMetricData(ctx, input)
-			if err != nil {
-				fmt.Fprintf(os.Stderr, "%s\n", err)
-			}
-		case <-ctx.Done():
-			return
-		}
+func (p *AmazonCloudWatchPublisher) Publish(ctx context.Context, metrics types.Metrics) {
+	var mData []cwtypes.MetricDatum
+	for _, m := range metrics.Data {
+		dimensions := p.convertTags(m.Tags)
+		mData = append(mData, cwtypes.MetricDatum{
+			MetricName:        aws.String(m.Name),
+			Timestamp:         &m.Timestamp,
+			Value:             &m.Value,
+			StorageResolution: aws.Int32(1),
+			Dimensions:        dimensions,
+		})
+	}
+	input := &cloudwatch.PutMetricDataInput{
+		MetricData: mData,
+		Namespace:  aws.String("IStatsD"),
+	}
+	_, err := p.Client.PutMetricData(ctx, input)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "%s\n", err)
 	}
 }
 
