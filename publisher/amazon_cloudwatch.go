@@ -30,19 +30,21 @@ func (p *AmazonCloudWatchPublisher) Publish(ctx context.Context, metrics types.M
 	for _, m := range metrics.Data {
 		fmt.Printf("dubug1: %s %f %s\n", m.Name, m.Value, m.Timestamp)
 		dimensions := p.convertTags(m.Tags)
-		mData = append(mData, cwtypes.MetricDatum{
+		data := cwtypes.MetricDatum{
 			MetricName:        aws.String(m.Name),
-			Timestamp:         &m.Timestamp,
-			Value:             &m.Value,
+			Timestamp:         aws.Time(m.Timestamp),
+			Value:             aws.Float64(m.Value),
 			StorageResolution: aws.Int32(1),
 			Dimensions:        dimensions,
-		})
+		}
+		fmt.Printf("dubug2: %s %f %s\n", *data.MetricName, *data.Value, data.Timestamp)
+		mData = append(mData, data)
 		for _, d := range mData {
-			fmt.Printf("dubug2: %s %f %s\n", *d.MetricName, *d.Value, d.Timestamp)
+			fmt.Printf("dubug3: %s %f %s\n", *d.MetricName, *d.Value, d.Timestamp)
 		}
 	}
 	for _, d := range mData {
-		fmt.Printf("dubug3: %s %f %s\n", *d.MetricName, *d.Value, d.Timestamp)
+		fmt.Printf("dubug4: %s %f %s\n", *d.MetricName, *d.Value, d.Timestamp)
 	}
 	// input := &cloudwatch.PutMetricDataInput{
 	// 	MetricData: mData,
