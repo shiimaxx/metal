@@ -89,14 +89,15 @@ func main() {
 	}
 	go collector.Run(ctx, duration, metricCh)
 
-	// publisher, err := publisher.NewAmazonCloudEatchPublisher()
-	// if err != nil {
-	// 	log.Fatal(err)
-	// }
+	cwPublisher, err := publisher.NewAmazonCloudEatchPublisher()
+	if err != nil {
+		log.Fatal(err)
+	}
 
 	publisher := publisher.PublisherManager{
 		Publishers: []publisher.Publisher{
-			&publisher.StdoutPublisher{},
+			// &publisher.StdoutPublisher{},
+			cwPublisher,
 		},
 	}
 	go publisher.Run(ctx, metricCh)
